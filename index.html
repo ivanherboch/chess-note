@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notation Algébrique Anglaise - Échecs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .chessboard { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); aspect-ratio: 1/1; border: 2px solid #4a5568; border-radius: 8px; background: #1a202c; position: relative; overflow: hidden; }
+        .square { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 1/1; }
+        .square-light { background: #f7fafc; }
+        .square-dark { background: #4a5568; }
+        .square-highlight-from { background: rgba(255, 255, 0, 0.4) !important; }
+        .square-highlight-to { background: rgba(0, 255, 0, 0.4) !important; }
+        .square-coord { position: absolute; font-size: 10px; font-weight: bold; color: #718096; user-select: none; }
+        .coord-row { bottom: 2px; right: 2px; }
+        .coord-col { top: 2px; left: 2px; }
+        .piece { position: absolute; width: 85%; height: 85%; z-index: 10; transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+        .piece-animating { transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important; z-index: 30 !important; }
+        .arrow-svg { position: absolute; z-index: 5; pointer-events: none; }
+        .check-halo { position: absolute; width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(circle, rgba(255, 0, 0, 0.5) 0%, rgba(255, 0, 0, 0) 70%); z-index: 1; pointer-events: none; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.8; } }
+        .capture-badge { position: absolute; width: 24px; height: 24px; background: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; color: white; z-index: 20; top: 5%; right: 5%; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .input-display { background: #2d3748; border: 2px solid #4a5568; border-radius: 6px; padding: 10px 16px; font-family: 'Courier New', monospace; font-size: 20px; text-align: center; letter-spacing: 2px; color: #f7fafc; min-height: 48px; }
+        .btn-virtual { background: #2d3748; border: 2px solid #4a5568; border-radius: 6px; padding: 10px 12px; font-family: 'Courier New', monospace; font-size: 18px; color: #f7fafc; cursor: pointer; transition: all 0.2s ease; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
+        .btn-virtual:hover { background: #4a5568; border-color: #718096; }
+        .btn-virtual:active { background: #1a202c; border-color: #2d3748; }
+        .btn-virtual.piece-btn { font-size: 14px; flex-direction: column; }
+        .btn-virtual.piece-btn .piece-name { font-size: 10px; opacity: 0.7; margin-top: 2px; }
+        .btn-action { background: #38b2ac; border: none; border-radius: 6px; padding: 10px 16px; font-size: 16px; color: white; cursor: pointer; transition: all 0.2s ease; font-weight: bold; }
+        .btn-action:hover { background: #4299e1; }
+        .btn-level { background: #2d3748; border: 2px solid #4a5568; border-radius: 6px; padding: 8px 14px; font-size: 14px; color: #f7fafc; cursor: pointer; transition: all 0.2s ease; }
+        .btn-level.active { background: #38b2ac; border-color: #4299e1; }
+        .btn-level:hover:not(.active) { background: #4a5568; }
+        .memo-panel { background: #1a202c; border: 2px solid #2d3748; border-radius: 8px; padding: 16px; max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s ease; }
+        .memo-panel.open { max-height: 500px; padding: 16px; }
+        .memo-content { color: #cbd5e0; line-height: 1.6; }
+        .memo-content h3 { color: #f7fafc; margin-top: 12px; margin-bottom: 8px; font-size: 16px; }
+        .memo-content p { margin-bottom: 8px; font-size: 14px; }
+        .score-display { background: #2d3748; border-radius: 6px; padding: 8px 16px; font-family: monospace; font-size: 16px; }
+        .streak-fire { color: #f56565; animation: bounce 0.5s infinite alternate; }
+        @keyframes bounce { from { transform: scale(1); } to { transform: scale(1.1); } }
+        .hint-text { color: #68d391; font-style: italic; font-size: 14px; margin-top: 8px; }
+        .feedback { margin-top: 12px; padding: 10px 14px; border-radius: 6px; font-size: 14px; line-height: 1.5; display: none; }
+        .feedback.correct { background: rgba(46, 160, 67, 0.2); border-left: 4px solid #2e8b57; color: #68d391; display: block; }
+        .feedback.incorrect { background: rgba(245, 101, 101, 0.2); border-left: 4px solid #ef4444; color: #f56565; display: block; }
+        .level-selector { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .controls-top { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 12px; }
+        .keyboard-row { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 8px; }
+        .keyboard-special { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 8px; }
+        .input-section { background: #2d3748; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+        .input-controls { display: flex; justify-content: space-between; margin-top: 8px; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-4 md:p-6 lg:p-8">
+    <div class="max-w-6xl mx-auto">
+        <header class="text-center mb-6">
+            <h1 class="text-2xl md:text-3xl font-bold mb-2">Notation Algébrique Anglaise (SAN)</h1>
+            <p class="text-gray-400 text-sm mb-4">Apprenez la notation FIDE standard - Niveau <span id="current-level" class="text-teal-400 font-bold">Tous</span></p>
+            <div class="level-selector justify-center">
+                <button class="btn-level active" data-level="0">Tous</button>
+                <button class="btn-level" data-level="1">Niveau 1</button>
+                <button class="btn-level" data-level="2">Niveau 2</button>
+                <button class="btn-level" data-level="3">Niveau 3</button>
+            </div>
+            <div class="flex justify-center items-center gap-4 text-sm">
+                <div class="score-display">Score: <span id="score">0</span></div>
+                <div class="score-display">Série: <span id="streak">0</span><span id="streak-fire" class="streak-fire ml-1"></span></div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2">
+                <div class="controls-top">
+                    <button id="btn-flip" class="btn-action">⇅ Noirs en bas</button>
+                    <button id="btn-replay" class="btn-action">🔄 Rejouer</button>
+                    <button id="btn-new" class="btn-action">🎲 Nouveau</button>
+                    <button id="btn-hint" class="btn-action">💡 Indice</button>
+                </div>
+                <div id="feedback" class="feedback"></div>
+                <div class="relative">
+                    <div class="flex justify-between mb-2">
+                        <span class="text-xs text-gray-500 w-6 text-center">a</span>
+                        <span class="text-xs text-gray-500 w-6 text-center">b</span>
+                        <span class="text-xs text-gray-500 w-6 text-center">c</span>
+                        <span class="text-xs text-gray-500 w-6 text-center">d</span>
+                        <span class="text-xs text-gray-500 w-6 text-center">e</span>
+                        <span class="text-xs text-gray-500 w-6 text-center">f</span>
+                        <span class="text-xs text-gray-500 w-6 text-center">g</span>
+                        <span class="text-xs text-gray-500 w-6 text-center">h</span>
+                    </div>
+                    <div id="chessboard" class="chessboard"></div>
+                    <div class="flex justify-between mt-2">
+                        <span class="text-xs text-gray-500 w-6 text-center">8</span>
+                        <span class="text-xs text-gray-500 w-6 text-center">7</span>
